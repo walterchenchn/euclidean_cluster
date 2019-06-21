@@ -1,0 +1,3 @@
+<launch>
+    <node pkg="euclidean_cluster" type="euclidean_cluster_node" name="euclidean_cluster_node" output="screen"/>
+</launch>
