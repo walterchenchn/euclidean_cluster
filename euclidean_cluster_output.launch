@@ -50,5 +50,6 @@
     </node>
     
     <node pkg="euclidean_cluster" type="euclidean_cluster_node" name="euclidean_cluster_node" output="screen"/>
+    <node pkg="tf" type="static_transform_publisher" name="velodyne_to_base_footprint_broadcaster" args="-1 0 -1 0 0 0 /velodyne /base_link 10"/>
     <node pkg="rviz" type="rviz" name="rviz" output="screen" args="-d /home/walter/division/src/euclidean_cluster/rviz/division.rviz"/>
 </launch>

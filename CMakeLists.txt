@@ -25,7 +25,7 @@ include_directories(
 )
 link_directories(${PCL_LIBRARY_DIRS})
 
-add_executable(${PROJECT_NAME}_node src/euclidean_cluster_node.cpp src/euclidean_cluster_core.cpp)
+add_executable(${PROJECT_NAME}_node src/euclidean_cluster_node.cpp src/euclidean_cluster_core.cpp src/tf_listerner.cpp)
 
 
 target_link_libraries(${PROJECT_NAME}_node

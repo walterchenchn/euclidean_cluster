@@ -2,17 +2,17 @@
 
 EuClusterCore::EuClusterCore(ros::NodeHandle &nh)
 {
-
-    //seg_distance_ = {15, 30, 45, 60};
-
     //
     //生成检测图
     seg_distance_ = {15, 30, 45, 60};
     cluster_distance_ = {0.5, 1.0, 1.5, 2.0, 2.5};
+
+    //接收路径信息
+    sub_path_ = nh.subscribe("/path", 5, &EuClusterCore::path_point, this);
     sub_point_cloud_ = nh.subscribe("/filtered_points_no_ground", 5, &EuClusterCore::point_cb, this);
 
     pub_bounding_boxs_ = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>("/detected_bounding_boxs", 5);
-
+    pub_path_length_ = nh.advertise<std_msgs::Int8>("/pub_path_length", 5);
     ros::spin();
 }
 
@@ -78,10 +78,6 @@ void EuClusterCore::cluster_segment(pcl::PointCloud<pcl::PointXYZ>::Ptr in_pc,
         float min_z = std::numeric_limits<float>::max();
         float max_z = -std::numeric_limits<float>::max();
 
-        // 一朵点云离车最小半径和位置
-        float min_radius = 100;
-        float theta = 0;
-
         for (auto pit = local_indices[i].indices.begin(); pit != local_indices[i].indices.end(); ++pit)
         {
             //fill new colored cluster point by point
@@ -106,14 +102,6 @@ void EuClusterCore::cluster_segment(pcl::PointCloud<pcl::PointXYZ>::Ptr in_pc,
                 max_y = p.y;
             if (p.z > max_z)
                 max_z = p.z;
-
-            // 计算一朵点云中距离最小的点
-            auto radius = (float)sqrt(p.x * p.x + p.y * p.y);
-            if (radius < min_radius)
-            {
-                min_radius = radius;
-                theta = (float)atan2(p.y, p.x) * 180 / M_PI;
-            }
         }
 
         //min, max points
@@ -148,37 +136,8 @@ void EuClusterCore::cluster_segment(pcl::PointCloud<pcl::PointXYZ>::Ptr in_pc,
         obj_info.bounding_box_.dimensions.y = ((width_ < 0) ? -1 * width_ : width_);
         obj_info.bounding_box_.dimensions.z = ((height_ < 0) ? -1 * height_ : height_);
 
-        // // 当一朵点云最小半径和角度同时在危险范围内,则输出
-        // if(min_radius < 15 && fabs(theta) < 7)
-        // {
-        //     block_num++;
-        //     //ROS_INFO("The min radius is: %d %f", frame_num, min_radius);
-        //     //ROS_INFO("The theta is: %d %f", frame_num, theta);
-        //     ROS_INFO("The min radius is: %f", min_radius);
-        //     ROS_INFO("The theta is: %f", theta);
-        // }
         obj_list.push_back(obj_info);
     }
-    // if (block_num)
-    // {
-    //     std::ofstream outFile;
-    //     outFile.open("/home/walter/division/barrier.csv", std::ios::out); // 打开模式可省略
-    //     //outFile.open("/home/firefly/Documents/walter/division/division.csv", std::ios::out); // 打开模式可省略
-    //     outFile << 'e' << ',' << 'f' << std::endl;
-    //     outFile << '0' << ',' << '1' << std::endl;
-    //     outFile << '0' << ',' << '0' << std::endl;
-    //     outFile.close();
-    // }
-    // else
-    // {
-    //     std::ofstream outFile;
-    //     outFile.open("/home/walter/division/barrier.csv", std::ios::out); // 打开模式可省略
-    //     //outFile.open("/home/firefly/Documents/walter/division/division.csv", std::ios::out); // 打开模式可省略
-    //     outFile << 'e' << ',' << 'f' << std::endl;
-    //     outFile << '0' << ',' << '0' << std::endl;
-    //     outFile << '0' << ',' << '0' << std::endl;
-    //     outFile.close();
-    // }
 }
 
 void EuClusterCore::cluster_by_distance(pcl::PointCloud<pcl::PointXYZ>::Ptr in_pc, std::vector<Detected_Obj> &obj_list)
@@ -209,9 +168,9 @@ void EuClusterCore::cluster_by_distance(pcl::PointCloud<pcl::PointXYZ>::Ptr in_p
 
         float origin_distance = sqrt(pow(current_point.x, 2) + pow(current_point.y, 2));
 
-        // 如果点的距离大于45m, 忽略该点
-        if (origin_distance >= 120)
-        // if (origin_distance >= 45)
+        // 如果点的距离大于60m, 忽略该点
+        //if (origin_distance >= 120)
+        if (origin_distance >= 60)
         {
             continue;
         }
@@ -248,6 +207,125 @@ void EuClusterCore::cluster_by_distance(pcl::PointCloud<pcl::PointXYZ>::Ptr in_p
     }
 }
 
+//接收路径信息
+/*
+void EuClusterCore::path_point(nav_msgs::Path path)
+{
+    tf::TransformListener listener(ros::Duration(0.01));
+    geometry_msgs::PointStamped path_point_temp1;
+    geometry_msgs::PointStamped path_point_temp2;
+	path_point_temp1.header.frame_id = path.header.frame_id;
+	path_point_temp2.header.frame_id = path.header.frame_id;
+	path_point_temp1.header.stamp = path.header.stamp;
+    path_point_temp2.header.stamp = path.header.stamp;
+
+    for(int i = 0; i < path.poses.size(); i++)
+    {
+        path_point_temp1.point.x = path.poses[i].pose.position.x;
+        path_point_temp1.point.y = path.poses[i].pose.position.y;
+        path_point_temp1.point.z = path.poses[i].pose.position.z;
+
+        listener.transformPoint("/velodyne", path_point_temp1, path_point_temp2);
+
+        path_.poses[i].pose.position.x = path_point_temp2.point.x;
+        path_.poses[i].pose.position.y = path_point_temp2.point.y;
+        path_.poses[i].pose.position.z = path_point_temp2.point.z;
+    }
+}
+*/
+void EuClusterCore::path_point(nav_msgs::Path path)
+{
+    Tf_Listerner tf("/velodyne", "/world");
+    auto ox = tf.ox();
+    auto oy = tf.oy();
+    auto oz = tf.oz();
+    auto ow = tf.ow();
+    tf::Quaternion q2(ox, oy, oz, ow);
+    tf::Matrix3x3 Matrix;
+    tf::Vector3 v3, v4, v5;
+    Matrix.setRotation(q2);
+    v3[0] = tf.x();
+    v3[1] = tf.y();
+    v3[2] = tf.z();
+
+    for(int i = 0; i < path.poses.size(); i++)
+    {
+        v4[0] = path.poses[i].pose.position.x;
+        v4[1] = path.poses[i].pose.position.y;
+        v4[2] = path.poses[i].pose.position.z;
+        v5 = Matrix * v4 + v3;
+        path_.poses[i].pose.position.x = v5[0];
+        path_.poses[i].pose.position.y = v5[1];
+        path_.poses[i].pose.position.z = v5[2];
+    }
+}
+
+//计算点云中的点与路径点距离
+float EuClusterCore::dis_to_path(float barr_x, float barr_y)
+{
+    //确认path是否接收到 
+    if(!path_.poses.size())
+    {
+        ROS_INFO("NO Path!");
+        return 1000;
+    }
+
+    std::vector<float> path_length;
+    for (int i = 0; i < path_.poses.size(); i++)
+    {
+        if(i == 0)
+            path_length[i] += pow((pow(path_.poses[i].pose.position.x, 2) + pow(path_.poses[i].pose.position.y, 2)), 0.5);
+        else
+            path_length[i] += pow((pow(path_.poses[i].pose.position.x - path_.poses[i - 1].pose.position.x, 2) + pow(path_.poses[i].pose.position.y - path_.poses[i - 1].pose.position.y, 2)), 0.5);
+    }   
+
+    float min_point_dis = 10000;
+    float dis_temp = 0;
+ 
+    for (int i = 0; i < path_.poses.size(); i++)
+    {
+        dis_temp = pow(barr_x - path_.poses[i].pose.position.x, 2) + pow(barr_y - path_.poses[i].pose.position.y, 2);
+        if(dis_temp > 4)
+            continue;
+        if (min_point_dis > dis_temp + path_length[i])
+        {
+            min_point_dis = dis_temp;
+        }
+    }
+    return min_point_dis;
+}
+
+//路径上的障碍物
+float EuClusterCore::path_barrier(std::vector<Detected_Obj> &obj_list)
+{
+    float dis_path = 1000;
+    for (size_t i = 0; i < obj_list.size(); i++)
+    {
+        float mid_x = obj_list[i].bounding_box_.pose.position.x;
+        float mid_y = obj_list[i].bounding_box_.pose.position.y;
+
+        float cloud_x_dis = obj_list[i].bounding_box_.dimensions.x;
+        float cloud_y_dis = obj_list[i].bounding_box_.dimensions.y;
+
+        float min_x = mid_x - cloud_x_dis / 2;
+        float max_x = mid_x + cloud_x_dis / 2;
+        float min_y = mid_y - cloud_y_dis / 2;
+        float max_y = mid_y + cloud_y_dis / 2;
+
+        if (dis_path > dis_to_path(mid_x, min_y))
+            dis_path = dis_to_path(mid_x, min_y);
+        if (dis_path > dis_to_path(min_x, min_y))
+            dis_path = dis_to_path(min_x, min_y);
+        if (dis_path > dis_to_path(min_x, mid_y))
+            dis_path = dis_to_path(min_x, mid_y);
+        if (dis_path > dis_to_path(min_x, max_y))
+            dis_path = dis_to_path(min_x, max_y);
+        if (dis_path > dis_to_path(mid_x, max_y))
+            dis_path = dis_to_path(mid_x, max_y);
+    }
+    return dis_path;
+}
+
 void EuClusterCore::point_cb(const sensor_msgs::PointCloud2ConstPtr &in_cloud_ptr)
 {
     pcl::PointCloud<pcl::PointXYZ>::Ptr current_pc_ptr(new pcl::PointCloud<pcl::PointXYZ>);
@@ -263,6 +341,13 @@ void EuClusterCore::point_cb(const sensor_msgs::PointCloud2ConstPtr &in_cloud_pt
     cluster_by_distance(filtered_pc_ptr, global_obj_list);
 
     jsk_recognition_msgs::BoundingBoxArray bbox_array;
+
+    std_msgs::Int8 dis;
+    int path_dis = 0;
+    path_dis = path_barrier(global_obj_list);
+    dis.data = path_dis;
+    ROS_INFO("The min dis is %d", path_dis);
+    pub_path_length_.publish(dis);
 
     for (size_t i = 0; i < global_obj_list.size(); i++)
     {

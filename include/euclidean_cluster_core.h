@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ros/ros.h>
+#include <std_msgs/Int8.h>
 
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
@@ -27,10 +28,18 @@
 
 #include <sensor_msgs/PointCloud2.h>
 
+#include <nav_msgs/Path.h>
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <vector>
+
+#include <math.h>
+#include <vector> 
+#include <tf/tf.h>
+
+#include "tf_listerner.h"
 
 #define LEAF_SIZE 0.1 //定义降采样的leaf size，聚类是一个费时运算，为了减少计算量，我们通常先进行降采样
 #define MIN_CLUSTER_SIZE 20
@@ -52,7 +61,13 @@ private:
 
   ros::Subscriber sub_point_cloud_;
 
+  ros::Subscriber sub_path_;
+
   ros::Publisher pub_bounding_boxs_;
+
+  ros::Publisher pub_path_length_;
+
+  nav_msgs::Path path_;
 
   std::vector<double> seg_distance_, cluster_distance_;
 
@@ -63,7 +78,13 @@ private:
   void cluster_by_distance(pcl::PointCloud<pcl::PointXYZ>::Ptr in_pc, std::vector<Detected_Obj> &obj_list);
 
   void cluster_segment(pcl::PointCloud<pcl::PointXYZ>::Ptr in_pc,
-                       double in_max_cluster_distance, std::vector<Detected_Obj> & obj_list);
+                       double in_max_cluster_distance, std::vector<Detected_Obj> &obj_list);
+
+  void path_point(nav_msgs::Path path);
+
+  float dis_to_path(float barr_x, float barr_y);
+
+  float path_barrier(std::vector<Detected_Obj> &obj_list);
 
   void point_cb(const sensor_msgs::PointCloud2ConstPtr &in_cloud_ptr);
 
