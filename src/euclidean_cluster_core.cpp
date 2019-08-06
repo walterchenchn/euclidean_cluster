@@ -2,11 +2,6 @@
 
 EuClusterCore::EuClusterCore(ros::NodeHandle &nh)
 {
-
-    //seg_distance_ = {15, 30, 45, 60};
-
-    //
-    //生成检测图
     seg_distance_ = {15, 30, 45, 60};
     cluster_distance_ = {0.5, 1.0, 1.5, 2.0, 2.5};
     sub_point_cloud_ = nh.subscribe("/filtered_points_no_ground", 5, &EuClusterCore::point_cb, this);
@@ -78,10 +73,6 @@ void EuClusterCore::cluster_segment(pcl::PointCloud<pcl::PointXYZ>::Ptr in_pc,
         float min_z = std::numeric_limits<float>::max();
         float max_z = -std::numeric_limits<float>::max();
 
-        // 一朵点云离车最小半径和位置
-        float min_radius = 100;
-        float theta = 0;
-
         for (auto pit = local_indices[i].indices.begin(); pit != local_indices[i].indices.end(); ++pit)
         {
             //fill new colored cluster point by point
@@ -106,14 +97,6 @@ void EuClusterCore::cluster_segment(pcl::PointCloud<pcl::PointXYZ>::Ptr in_pc,
                 max_y = p.y;
             if (p.z > max_z)
                 max_z = p.z;
-
-            // 计算一朵点云中距离最小的点
-            auto radius = (float)sqrt(p.x * p.x + p.y * p.y);
-            if (radius < min_radius)
-            {
-                min_radius = radius;
-                theta = (float)atan2(p.y, p.x) * 180 / M_PI;
-            }
         }
 
         //min, max points
@@ -148,37 +131,8 @@ void EuClusterCore::cluster_segment(pcl::PointCloud<pcl::PointXYZ>::Ptr in_pc,
         obj_info.bounding_box_.dimensions.y = ((width_ < 0) ? -1 * width_ : width_);
         obj_info.bounding_box_.dimensions.z = ((height_ < 0) ? -1 * height_ : height_);
 
-        // // 当一朵点云最小半径和角度同时在危险范围内,则输出
-        // if(min_radius < 15 && fabs(theta) < 7)
-        // {
-        //     block_num++;
-        //     //ROS_INFO("The min radius is: %d %f", frame_num, min_radius);
-        //     //ROS_INFO("The theta is: %d %f", frame_num, theta);
-        //     ROS_INFO("The min radius is: %f", min_radius);
-        //     ROS_INFO("The theta is: %f", theta);
-        // }
         obj_list.push_back(obj_info);
     }
-    // if (block_num)
-    // {
-    //     std::ofstream outFile;
-    //     outFile.open("/home/walter/division/barrier.csv", std::ios::out); // 打开模式可省略
-    //     //outFile.open("/home/firefly/Documents/walter/division/division.csv", std::ios::out); // 打开模式可省略
-    //     outFile << 'e' << ',' << 'f' << std::endl;
-    //     outFile << '0' << ',' << '1' << std::endl;
-    //     outFile << '0' << ',' << '0' << std::endl;
-    //     outFile.close();
-    // }
-    // else
-    // {
-    //     std::ofstream outFile;
-    //     outFile.open("/home/walter/division/barrier.csv", std::ios::out); // 打开模式可省略
-    //     //outFile.open("/home/firefly/Documents/walter/division/division.csv", std::ios::out); // 打开模式可省略
-    //     outFile << 'e' << ',' << 'f' << std::endl;
-    //     outFile << '0' << ',' << '0' << std::endl;
-    //     outFile << '0' << ',' << '0' << std::endl;
-    //     outFile.close();
-    // }
 }
 
 void EuClusterCore::cluster_by_distance(pcl::PointCloud<pcl::PointXYZ>::Ptr in_pc, std::vector<Detected_Obj> &obj_list)
@@ -242,7 +196,6 @@ void EuClusterCore::cluster_by_distance(pcl::PointCloud<pcl::PointXYZ>::Ptr in_p
     std::vector<pcl::PointIndices> tmp_indices;
 
     for (size_t i = 0; i < segment_pc_array.size(); i++)
-    // for (size_t i = 0; i < 1; i++)  //仅输出最近处点云
     {
         cluster_segment(segment_pc_array[i], cluster_distance_[i], obj_list);
     }
